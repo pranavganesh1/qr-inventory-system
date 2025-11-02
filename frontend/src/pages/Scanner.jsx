@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { scanItem, updateItem } from '../services/api';
 import './Scanner.css';
@@ -9,32 +9,23 @@ const Scanner = () => {
   const [action, setAction] = useState('view');
   const [quantity, setQuantity] = useState(1);
   const [message, setMessage] = useState('');
+  const scannerRef = useRef(null);
 
-  const startScanning = () => {
-    setScanning(true);
-    setMessage('');
-    
-    const scanner = new Html5QrcodeScanner('qr-reader', {
-      qrbox: { width: 250, height: 250 },
-      fps: 5,
-    });
-
-    scanner.render(onScanSuccess, onScanError);
-
-    function onScanSuccess(decodedText) {
-      scanner.clear();
-      setScanning(false);
-      handleScan(decodedText);
-    }
-
-    function onScanError(err) {
-      console.warn(err);
-    }
-  };
-
-  const handleScan = async (data) => {
+  const handleScan = useCallback(async (data) => {
     try {
-      const parsedData = JSON.parse(data);
+      let parsedData;
+      try {
+        parsedData = JSON.parse(data);
+      } catch (parseError) {
+        setMessage('Invalid QR code format. Expected JSON with sku and name.');
+        return;
+      }
+
+      if (!parsedData.sku) {
+        setMessage('QR code missing SKU information.');
+        return;
+      }
+
       const response = await scanItem({
         sku: parsedData.sku,
         action: 'view'
@@ -43,9 +34,78 @@ const Scanner = () => {
       setMessage('Item scanned successfully!');
     } catch (error) {
       console.error('Error scanning item:', error);
-      setMessage('Error scanning item. Please try again.');
+      const errorMsg = error.response?.data?.message || 'Error scanning item. Please try again.';
+      setMessage(errorMsg);
     }
+  }, []);
+
+  const startScanning = () => {
+    setScanning(true);
+    setMessage('');
+    setScannedItem(null);
   };
+
+  const stopScanning = () => {
+    if (scannerRef.current) {
+      try {
+        scannerRef.current.clear();
+      } catch (err) {
+        console.warn('Error clearing scanner:', err);
+      }
+      scannerRef.current = null;
+    }
+    setScanning(false);
+  };
+
+  useEffect(() => {
+    if (scanning) {
+      // Wait for the DOM element to be rendered
+      const timer = setTimeout(() => {
+        const element = document.getElementById('qr-reader');
+        if (element && !scannerRef.current) {
+          try {
+            const scanner = new Html5QrcodeScanner('qr-reader', {
+              qrbox: { width: 250, height: 250 },
+              fps: 5,
+            });
+
+            scanner.render(
+              (decodedText) => {
+                // Success callback
+                if (scannerRef.current) {
+                  scannerRef.current.clear();
+                  scannerRef.current = null;
+                }
+                setScanning(false);
+                handleScan(decodedText);
+              },
+              (errorMessage) => {
+                // Error callback - just log, don't stop scanning
+                // The scanner will keep trying automatically
+              }
+            );
+
+            scannerRef.current = scanner;
+          } catch (err) {
+            console.error('Error initializing scanner:', err);
+            setScanning(false);
+          }
+        }
+      }, 100); // Small delay to ensure DOM is ready
+
+      return () => {
+        clearTimeout(timer);
+        if (scannerRef.current) {
+          try {
+            scannerRef.current.clear();
+          } catch (err) {
+            console.warn('Error clearing scanner in cleanup:', err);
+          }
+          scannerRef.current = null;
+        }
+      };
+    }
+  }, [scanning, handleScan]);
 
   const handleUpdateQuantity = async () => {
     if (!scannedItem) return;
@@ -91,7 +151,7 @@ const Scanner = () => {
       {scanning && (
         <div className="scanner-active">
           <div id="qr-reader"></div>
-          <button onClick={() => setScanning(false)} className="btn btn-secondary">
+          <button onClick={stopScanning} className="btn btn-secondary">
             Cancel
           </button>
         </div>
