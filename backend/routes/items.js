@@ -1,3 +1,6 @@
+// ============================================
+// FILE: backend/routes/items.js (FIXED VERSION)
+// ============================================
 const express = require('express');
 const router = express.Router();
 const Item = require('../models/Item');
@@ -6,11 +9,12 @@ const { protect } = require('../middleware/auth');
 const { generateQRCode } = require('../utils/qrGenerator');
 
 // @route   GET /api/items
-// @desc    Get all items
+// @desc    Get all items for the current user
 // @access  Private
 router.get('/', protect, async (req, res) => {
   try {
-    const items = await Item.find().sort({ createdAt: -1 });
+    // FIXED: Only get items created by current user
+    const items = await Item.find({ createdBy: req.user._id }).sort({ createdAt: -1 });
     res.json(items);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -18,12 +22,14 @@ router.get('/', protect, async (req, res) => {
 });
 
 // @route   GET /api/items/search
-// @desc    Search items
+// @desc    Search items for current user
 // @access  Private
 router.get('/search', protect, async (req, res) => {
   try {
     const { q } = req.query;
+    // FIXED: Search only in user's items
     const items = await Item.find({
+      createdBy: req.user._id,
       $or: [
         { name: { $regex: q, $options: 'i' } },
         { sku: { $regex: q, $options: 'i' } },
@@ -41,9 +47,14 @@ router.get('/search', protect, async (req, res) => {
 // @access  Private
 router.get('/:id', protect, async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id);
+    // FIXED: Check if item belongs to user
+    const item = await Item.findOne({
+      _id: req.params.id,
+      createdBy: req.user._id
+    });
+    
     if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
+      return res.status(404).json({ message: 'Item not found or access denied' });
     }
     res.json(item);
   } catch (err) {
@@ -58,7 +69,7 @@ router.post('/', protect, async (req, res) => {
   try {
     const itemData = {
       ...req.body,
-      createdBy: req.user._id
+      createdBy: req.user._id  // Assign to current user
     };
 
     const item = new Item(itemData);
@@ -67,7 +78,8 @@ router.post('/', protect, async (req, res) => {
     const qrData = {
       id: item._id,
       sku: item.sku,
-      name: item.name
+      name: item.name,
+      userId: req.user._id  // Include user ID in QR
     };
     item.qrCode = await generateQRCode(qrData);
 
@@ -97,9 +109,14 @@ router.post('/', protect, async (req, res) => {
 // @access  Private
 router.put('/:id', protect, async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id);
+    // FIXED: Check if item belongs to user
+    const item = await Item.findOne({
+      _id: req.params.id,
+      createdBy: req.user._id
+    });
+    
     if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
+      return res.status(404).json({ message: 'Item not found or access denied' });
     }
 
     const previousQuantity = item.quantity;
@@ -133,10 +150,16 @@ router.put('/:id', protect, async (req, res) => {
 // @access  Private
 router.delete('/:id', protect, async (req, res) => {
   try {
-    const item = await Item.findById(req.params.id);
+    // FIXED: Check if item belongs to user
+    const item = await Item.findOne({
+      _id: req.params.id,
+      createdBy: req.user._id
+    });
+    
     if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
+      return res.status(404).json({ message: 'Item not found or access denied' });
     }
+    
     await item.deleteOne();
     res.json({ message: 'Item removed' });
   } catch (err) {
@@ -150,10 +173,17 @@ router.delete('/:id', protect, async (req, res) => {
 router.post('/scan', protect, async (req, res) => {
   try {
     const { sku, action, quantity } = req.body;
-    const item = await Item.findOne({ sku });
+    
+    // FIXED: Find item belonging to current user
+    const item = await Item.findOne({ 
+      sku: sku,
+      createdBy: req.user._id
+    });
 
     if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
+      return res.status(404).json({ 
+        message: 'Item not found or does not belong to you' 
+      });
     }
 
     const previousQuantity = item.quantity;
