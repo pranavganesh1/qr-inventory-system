@@ -7,6 +7,7 @@ const Item = require('../models/Item');
 const Transaction = require('../models/Transaction');
 const { protect } = require('../middleware/auth');
 const { generateQRCode } = require('../utils/qrGenerator');
+const { validateItem, validateItemUpdate, validateSearch, validateScan, validateObjectId } = require('../middleware/validation');
 
 // @route   GET /api/items
 // @desc    Get all items for the current user
@@ -24,7 +25,7 @@ router.get('/', protect, async (req, res) => {
 // @route   GET /api/items/search
 // @desc    Search items for current user
 // @access  Private
-router.get('/search', protect, async (req, res) => {
+router.get('/search', protect, validateSearch, async (req, res) => {
   try {
     const { q } = req.query;
     // FIXED: Search only in user's items
@@ -45,7 +46,7 @@ router.get('/search', protect, async (req, res) => {
 // @route   GET /api/items/:id
 // @desc    Get single item
 // @access  Private
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', protect, validateObjectId('id'), async (req, res) => {
   try {
     // FIXED: Check if item belongs to user
     const item = await Item.findOne({
@@ -65,7 +66,7 @@ router.get('/:id', protect, async (req, res) => {
 // @route   POST /api/items
 // @desc    Create new item
 // @access  Private
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, validateItem, async (req, res) => {
   try {
     const itemData = {
       ...req.body,
@@ -107,7 +108,7 @@ router.post('/', protect, async (req, res) => {
 // @route   PUT /api/items/:id
 // @desc    Update item
 // @access  Private
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', protect, validateObjectId('id'), validateItemUpdate, async (req, res) => {
   try {
     // FIXED: Check if item belongs to user
     const item = await Item.findOne({
@@ -148,7 +149,7 @@ router.put('/:id', protect, async (req, res) => {
 // @route   DELETE /api/items/:id
 // @desc    Delete item
 // @access  Private
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', protect, validateObjectId('id'), async (req, res) => {
   try {
     // FIXED: Check if item belongs to user
     const item = await Item.findOne({
@@ -170,7 +171,7 @@ router.delete('/:id', protect, async (req, res) => {
 // @route   POST /api/items/scan
 // @desc    Scan QR code and update item
 // @access  Private
-router.post('/scan', protect, async (req, res) => {
+router.post('/scan', protect, validateScan, async (req, res) => {
   try {
     const { sku, action, quantity } = req.body;
     

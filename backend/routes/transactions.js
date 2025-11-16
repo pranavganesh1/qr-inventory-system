@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Transaction = require('../models/Transaction');
 const { protect } = require('../middleware/auth');
+const { validateObjectId } = require('../middleware/validation');
 
 // @route   GET /api/transactions
 // @desc    Get all transactions
@@ -22,7 +23,7 @@ router.get('/', protect, async (req, res) => {
 // @route   GET /api/transactions/item/:itemId
 // @desc    Get transactions for specific item
 // @access  Private
-router.get('/item/:itemId', protect, async (req, res) => {
+router.get('/item/:itemId', protect, validateObjectId('itemId'), async (req, res) => {
   try {
     const transactions = await Transaction.find({ item: req.params.itemId })
       .populate('performedBy', 'name email')
