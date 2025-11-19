@@ -4,7 +4,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 // Security middleware
-const { helmetConfig, sanitize, apiLimiter } = require('./middleware/security');
+const { helmetConfig, sanitize, apiLimiter, authLimiter } = require('./middleware/security');
 
 const app = express();
 
@@ -58,7 +58,8 @@ mongoose.connect(process.env.MONGODB_URI, {
 .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // Routes
-app.use('/api/auth', require('./routes/auth'));
+// Apply stricter rate limiting to auth endpoints
+app.use('/api/auth', authLimiter, require('./routes/auth'));
 app.use('/api/items', require('./routes/items'));
 app.use('/api/transactions', require('./routes/transactions'));
 
