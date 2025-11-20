@@ -103,7 +103,7 @@ Auth:
 
 Items (all protected):
 - `GET /api/items` – List current user’s items
-- `GET /api/items/search?q=<query>` – Search current user’s items by name/SKU/description
+- `GET /api/items/search?q=<query>` – Search current user’s items by name/SKU/description.
 - `GET /api/items/:id` – Get an item (only if it belongs to the user)
 - `POST /api/items` – Create item; QR code is generated server‑side
 - `PUT /api/items/:id` – Update item; logs a transaction if quantity changes
