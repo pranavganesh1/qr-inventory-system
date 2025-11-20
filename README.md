@@ -165,4 +165,4 @@ Frontend:
 
 ## License
 
-This project is provided without a specific license in the repository. Add a license if you plan to distribute or open source.
+ MIT License 
